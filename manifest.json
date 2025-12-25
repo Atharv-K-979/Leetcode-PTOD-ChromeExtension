@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "LeetCode POTD Reminder",
+  "version": "1.0",
+  "description": "Reminds you to solve LeetCode's Problem of the Day if not yet solved.",
+  "permissions": [
+    "storage",
+    "notifications",
+    "alarms",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "*://leetcode.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://leetcode.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "LeetCode POTD Reminder"
+  }
+}
