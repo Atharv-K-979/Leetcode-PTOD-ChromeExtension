@@ -12,10 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Load and display today's POTD status
 function loadStatus() {
-  const today = new Date().toDateString();
-  chrome.storage.local.get([today], (result) => {
-    const status = result[today];
-    const statusText = status === true ? '✅ Solved' : status === false ? '❌ Not Solved' : '⚠️ Not Checked';
+  chrome.storage.local.get(['potdSolved'], (result) => {
+    const status = result.potdSolved;
+    const statusText = status === true ? '✅ Solved' : '❌ Not Solved';
     document.getElementById('status-text').textContent = statusText;
   });
 }
@@ -42,6 +41,7 @@ function checkStatusNow() {
     if (tab.url && tab.url.includes('leetcode.com')) {
       chrome.tabs.sendMessage(tab.id, { action: 'checkStatus' }, (response) => {
         if (response) {
+          chrome.storage.local.set({ potdSolved: response.status });
           loadStatus(); // Refresh status after check
         }
       });
