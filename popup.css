@@ -1,0 +1,19 @@
+body {
+  font-family: Arial, sans-serif;
+  padding: 10px;
+  width: 220px;
+}
+
+h3 {
+  margin-bottom: 8px;
+}
+
+#status-text {
+  margin: 6px 0;
+  font-weight: bold;
+}
+
+button {
+  margin-top: 8px;
+  width: 100%;
+}

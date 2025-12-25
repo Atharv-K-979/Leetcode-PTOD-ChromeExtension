@@ -7,21 +7,20 @@
     "storage",
     "notifications",
     "alarms",
-    "activeTab",
-    "tts"
+    "activeTab"
   ],
   "host_permissions": [
-    "*://leetcode.com/*"
-  ],
-  "content_scripts": [
-    {
-      "matches": ["*://leetcode.com/*"],
-      "js": ["content.js"]
-    }
+    "https://leetcode.com/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["https://leetcode.com/problems/*"],
+      "js": ["content.js"]
+    }
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_title": "LeetCode POTD Reminder"
