@@ -16,7 +16,7 @@ function loadStatus() {
 
 function loadSettings() {
   chrome.storage.local.get(["reminderTime", "enabled"], (res) => {
-    document.getElementById("time-select").value = res.reminderTime || "21:00";
+    document.getElementById("time-select").value = res.reminderTime || "09:00";
     document.getElementById("enable-toggle").checked = res.enabled !== false;
   });
 }
@@ -28,19 +28,27 @@ function saveSettings() {
   });
 }
 
+function showError(msg) {
+  document.getElementById("error-text").textContent = msg;
+}
+
 function checkNow() {
+  showError("");
+
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const tab = tabs[0];
-    if (!tab.url.includes("leetcode.com/problems")) {
-      alert("Open today’s POTD problem page first.");
+
+    if (!tab || !tab.url || !tab.url.includes("leetcode.com/problems")) {
+      showError("Open today’s POTD problem page.");
       return;
     }
 
     chrome.tabs.sendMessage(tab.id, { action: "checkStatus" }, (res) => {
-      if (chrome.runtime.lastError) {
-        alert("Unable to check. Reload POTD page.");
+      if (chrome.runtime.lastError || !res) {
+        showError("Unable to check. Reload POTD page.");
         return;
       }
+
       chrome.storage.local.set({ potdSolved: res.status }, loadStatus);
     });
   });

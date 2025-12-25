@@ -1,4 +1,4 @@
-console.log("POTD content script active:", location.href);
+console.log("POTD content script loaded:", location.href);
 
 function detectSolved() {
   const solved =
@@ -12,7 +12,7 @@ function detectSolved() {
   return solved;
 }
 
-// SPA delay handling
+// Handle LeetCode SPA delay
 setTimeout(detectSolved, 3000);
 
 // Manual check from popup

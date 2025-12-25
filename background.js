@@ -1,7 +1,6 @@
-const DEFAULT_REMINDER_TIME = "21:00"; // 9 PM
+const DEFAULT_REMINDER_TIME = "09:00"; // 9 AM
 const DEFAULT_ENABLED = true;
 
-// On install
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({
     reminderTime: DEFAULT_REMINDER_TIME,
@@ -11,17 +10,14 @@ chrome.runtime.onInstalled.addListener(() => {
   scheduleAlarms();
 });
 
-// On browser startup
 chrome.runtime.onStartup.addListener(scheduleAlarms);
 
-// Update alarms if settings change
 chrome.storage.onChanged.addListener((changes) => {
   if (changes.reminderTime || changes.enabled) {
     scheduleAlarms();
   }
 });
 
-// Schedule alarms
 function scheduleAlarms() {
   chrome.alarms.clearAll(() => {
     chrome.storage.local.get(["reminderTime", "enabled"], (res) => {
@@ -53,7 +49,6 @@ function scheduleAlarms() {
   });
 }
 
-// Alarm handler
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "reset") {
     chrome.storage.local.set({ potdSolved: false });
@@ -70,14 +65,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
           requireInteraction: true
         });
 
-        const audio = new Audio(chrome.runtime.getURL("./alaram.mp3"));
+        const audio = new Audio(chrome.runtime.getURL("alarm.mp3"));
         audio.play();
       }
     });
   }
 });
 
-// Notification click
 chrome.notifications.onClicked.addListener((id) => {
   if (id === "potd-reminder") {
     chrome.tabs.create({ url: "https://leetcode.com/problemset/daily-problem" });
