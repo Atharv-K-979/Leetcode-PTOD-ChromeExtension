@@ -1,20 +1,12 @@
 /**
  * LeetCode POTD Reminder - Background Service Worker (Manifest V3)
- * Handles daily alarms, notifications, and audio playback
+ * Handles daily alarms, notifications with system sounds
  */
 
-// Reminder times (24-hour format)
-const REMINDER_TIMES = [
-  "18:00", // 6:00 PM
-  "19:00", // 7:00 PM
-  "20:00", // 8:00 PM
-  "20:30", // 8:30 PM
-  "21:00", // 9:00 PM
-  "21:30"  // 9:30 PM
-];
-
-const ALARM_PREFIX = "potd_reminder_";
+const REMINDER_ALARM = "potd_reminder_repeat";
 const MIDNIGHT_ALARM = "midnight_reset";
+const REMINDER_INTERVAL_MINUTES = 30; // Repeat every 30 minutes
+const FIRST_REMINDER_HOUR = 18; // Start reminders at 6:00 PM
 
 /**
  * Initialize extension on install
@@ -58,29 +50,42 @@ function scheduleDailyAlarms() {
       periodInMinutes: 1440 // Daily
     });
     
-    // Schedule reminder alarms
-    REMINDER_TIMES.forEach(timeStr => {
-      const [hours, minutes] = timeStr.split(":").map(Number);
-      const alarmTime = new Date(now);
-      alarmTime.setHours(hours, minutes, 0, 0);
-      
-      // If time has passed today, schedule for tomorrow
-      if (alarmTime <= now) {
-        alarmTime.setDate(alarmTime.getDate() + 1);
-      }
-      
-      const alarmName = ALARM_PREFIX + timeStr.replace(":", "");
-      chrome.alarms.create(alarmName, {
-        when: alarmTime.getTime(),
-        periodInMinutes: 1440 // Daily
-      });
-      
-      console.log(`Scheduled alarm: ${alarmName} at ${alarmTime.toLocaleString()}`);
-    });
+    // Schedule first reminder for today
+    scheduleFirstReminder();
     
-    // Mark reminders as scheduled
-    chrome.storage.local.set({ remindersScheduled: true });
+    console.log("Daily alarms scheduled");
   });
+}
+
+/**
+ * Schedule the first reminder of the day
+ * Starts at 6:00 PM, then repeats every 30 minutes
+ */
+function scheduleFirstReminder() {
+  const now = new Date();
+  const firstReminder = new Date(now);
+  firstReminder.setHours(FIRST_REMINDER_HOUR, 0, 0, 0);
+  
+  // If 6 PM has passed today, start immediately (next 30-minute interval)
+  if (firstReminder <= now) {
+    // Calculate next 30-minute interval from now
+    const minutes = now.getMinutes();
+    const nextInterval = Math.ceil(minutes / REMINDER_INTERVAL_MINUTES) * REMINDER_INTERVAL_MINUTES;
+    firstReminder.setMinutes(nextInterval, 0, 0);
+    
+    // If that's still in the past (shouldn't happen), add 30 minutes
+    if (firstReminder <= now) {
+      firstReminder.setMinutes(firstReminder.getMinutes() + REMINDER_INTERVAL_MINUTES);
+    }
+  }
+  
+  // Create repeating alarm that fires every 30 minutes
+  chrome.alarms.create(REMINDER_ALARM, {
+    when: firstReminder.getTime(),
+    periodInMinutes: REMINDER_INTERVAL_MINUTES
+  });
+  
+  console.log(`First reminder scheduled for: ${firstReminder.toLocaleString()}, then every ${REMINDER_INTERVAL_MINUTES} minutes`);
 }
 
 /**
@@ -93,11 +98,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === MIDNIGHT_ALARM) {
     chrome.storage.local.set({ potdSolved: false });
     console.log("Midnight reset: potdSolved set to false");
+    // Schedule reminders for the new day
+    scheduleFirstReminder();
     return;
   }
   
-  // Handle reminder alarms
-  if (alarm.name.startsWith(ALARM_PREFIX)) {
+  // Handle repeating reminder alarm
+  if (alarm.name === REMINDER_ALARM) {
     checkAndSendReminder();
   }
 });
@@ -110,90 +117,49 @@ function checkAndSendReminder() {
     const isSolved = result.potdSolved === true;
     
     if (!isSolved) {
-      // Send notification
+      // Send notification with priority 2 to ensure system sound plays
       chrome.notifications.create({
         type: "basic",
+        iconUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
         title: "LeetCode POTD Reminder",
         message: "You haven't solved today's LeetCode POTD",
-        iconUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-        requireInteraction: true
+        priority: 2, // High priority ensures system notification sound plays
+        requireInteraction: false
+      }, (notificationId) => {
+        if (chrome.runtime.lastError) {
+          console.error("Notification error:", chrome.runtime.lastError);
+        } else {
+          console.log("Reminder notification sent:", notificationId);
+        }
       });
-      
-      // Play alarm sound via offscreen document
-      playAlarmSound();
-      
-      console.log("Reminder sent: POTD not solved");
     } else {
-      console.log("Reminder skipped: POTD already solved");
+      // POTD is solved - cancel the repeating alarm
+      chrome.alarms.clear(REMINDER_ALARM, (wasCleared) => {
+        if (wasCleared) {
+          console.log("Reminders stopped: POTD already solved");
+        }
+      });
     }
   });
 }
 
-/**
- * Play alarm sound using offscreen document
- */
-function playAlarmSound() {
-  // Check if offscreen document already exists
-  chrome.runtime.getContexts({
-    contextTypes: ["OFFSCREEN_DOCUMENT"],
-    documentUrls: [chrome.runtime.getURL("offscreen.html")]
-  }, (contexts) => {
-    if (contexts.length === 0) {
-      // Create offscreen document
-      chrome.offscreen.createDocument({
-        url: "offscreen.html",
-        reasons: ["AUDIO_PLAYBACK"],
-        justification: "Play alarm sound for LeetCode POTD reminder"
-      }).then(() => {
-        // Wait a bit for document to load, then send message
-        setTimeout(() => {
-          sendPlaySoundMessage();
-        }, 500);
-      }).catch(error => {
-        console.error("Error creating offscreen document:", error);
-      });
-    } else {
-      // Document exists, send message directly
-      sendPlaySoundMessage();
-    }
-  });
-}
-
-/**
- * Send play sound message to offscreen document
- */
-function sendPlaySoundMessage() {
-  // Send message - offscreen document will receive it via chrome.runtime.onMessage
-  chrome.runtime.sendMessage({
-    action: "playAlarmSound"
-  }).catch(error => {
-    console.error("Error sending message to offscreen document:", error);
-    // If message fails, try creating offscreen document again
-    chrome.offscreen.createDocument({
-      url: "offscreen.html",
-      reasons: ["AUDIO_PLAYBACK"],
-      justification: "Play alarm sound for LeetCode POTD reminder"
-    }).then(() => {
-      setTimeout(() => {
-        chrome.runtime.sendMessage({
-          action: "playAlarmSound"
-        }).catch(err => {
-          console.error("Retry failed:", err);
-        });
-      }, 500);
-    });
-  });
-}
 
 /**
  * Handle messages from content scripts and other parts
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "potdSolved") {
-    // User solved the problem
-    chrome.storage.local.set({ potdSolved: true });
-    console.log("POTD marked as solved");
-    sendResponse({ success: true });
+    // User solved the problem - stop all reminders immediately
+    chrome.storage.local.set({ potdSolved: true }, () => {
+      // Cancel the repeating reminder alarm
+      chrome.alarms.clear(REMINDER_ALARM, (wasCleared) => {
+        if (wasCleared) {
+          console.log("POTD marked as solved - all reminders stopped");
+        }
+        sendResponse({ success: true });
+      });
+    });
+    return true; // Keep message channel open for async response
   } else if (message.action === "getStatus") {
     // Get current POTD status
     chrome.storage.local.get(["potdSolved"], (result) => {

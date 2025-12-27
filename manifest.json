@@ -7,8 +7,7 @@
     "storage",
     "notifications",
     "alarms",
-    "activeTab",
-    "offscreen"
+    "activeTab"
   ],
   "host_permissions": [
     "https://leetcode.com/*"
@@ -25,11 +24,5 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "LeetCode POTD Reminder"
-  },
-  "web_accessible_resources": [
-    {
-      "resources": ["alarm.mp3"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  }
 }
