@@ -5,8 +5,12 @@
 
 const REMINDER_ALARM = "potd_reminder_repeat";
 const MIDNIGHT_ALARM = "midnight_reset";
-const REMINDER_INTERVAL_MINUTES = 30; // Repeat every 30 minutes
+const REMINDER_INTERVAL_MINUTES = 60; // Repeat every 1 hour
 const FIRST_REMINDER_HOUR = 18; // Start reminders at 6:00 PM
+const LAST_REMINDER_HOUR = 23; // Stop reminders at 11:00 PM (last reminder at 11 PM)
+
+// Track current notification ID to stop audio when closed
+let currentNotificationId = null;
 
 /**
  * Initialize extension on install
@@ -15,13 +19,27 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log("LeetCode POTD Reminder installed");
   
   // Initialize storage
-  chrome.storage.local.set({
-    potdSolved: false,
-    remindersScheduled: false
+  chrome.storage.local.get(["potdSolved"], (result) => {
+    const isSolved = result.potdSolved === true;
+    
+    // Set default if not exists
+    if (result.potdSolved === undefined) {
+      chrome.storage.local.set({
+        potdSolved: false,
+        remindersScheduled: false
+      });
+    }
+    
+    // Schedule all alarms
+    scheduleDailyAlarms();
+    
+    // Test notification if POTD not solved (for immediate testing)
+    if (!isSolved) {
+      setTimeout(() => {
+        sendTestNotification();
+      }, 2000); // Wait 2 seconds after install/reload to send test notification
+    }
   });
-  
-  // Schedule all alarms
-  scheduleDailyAlarms();
 });
 
 /**
@@ -30,7 +48,41 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.runtime.onStartup.addListener(() => {
   console.log("LeetCode POTD Reminder started");
   scheduleDailyAlarms();
+  
+  // Test notification on startup if POTD not solved
+  chrome.storage.local.get(["potdSolved"], (result) => {
+    const isSolved = result.potdSolved === true;
+    if (!isSolved) {
+      setTimeout(() => {
+        sendTestNotification();
+      }, 2000);
+    }
+  });
 });
+
+/**
+ * Send a test notification (for testing purposes)
+ */
+function sendTestNotification() {
+  console.log("Sending test notification...");
+  chrome.notifications.create({
+    type: "basic",
+    iconUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    title: "LeetCode POTD Reminder",
+    message: "You haven't solved today's LeetCode POTD",
+    priority: 2,
+    requireInteraction: false
+  }, (notificationId) => {
+    if (chrome.runtime.lastError) {
+      console.error("Test notification error:", chrome.runtime.lastError);
+    } else {
+      console.log("✅ Test notification sent! Playing alarm sound...");
+    }
+  });
+  
+  // Play alarm sound for test
+  playAlarmSound();
+}
 
 /**
  * Schedule all daily alarms for the day
@@ -59,33 +111,38 @@ function scheduleDailyAlarms() {
 
 /**
  * Schedule the first reminder of the day
- * Starts at 6:00 PM, then repeats every 30 minutes
+ * Starts at 6:00 PM, repeats every 1 hour until 11:00 PM
  */
 function scheduleFirstReminder() {
   const now = new Date();
   const firstReminder = new Date(now);
   firstReminder.setHours(FIRST_REMINDER_HOUR, 0, 0, 0);
   
-  // If 6 PM has passed today, start immediately (next 30-minute interval)
+  // If 6 PM has passed today, start at next hour
   if (firstReminder <= now) {
-    // Calculate next 30-minute interval from now
-    const minutes = now.getMinutes();
-    const nextInterval = Math.ceil(minutes / REMINDER_INTERVAL_MINUTES) * REMINDER_INTERVAL_MINUTES;
-    firstReminder.setMinutes(nextInterval, 0, 0);
+    // Move to next hour
+    firstReminder.setHours(firstReminder.getHours() + 1);
+    firstReminder.setMinutes(0, 0, 0);
     
-    // If that's still in the past (shouldn't happen), add 30 minutes
+    // If that's still in the past, add 1 hour
     if (firstReminder <= now) {
-      firstReminder.setMinutes(firstReminder.getMinutes() + REMINDER_INTERVAL_MINUTES);
+      firstReminder.setHours(firstReminder.getHours() + 1);
     }
   }
   
-  // Create repeating alarm that fires every 30 minutes
+  // Don't schedule if it's past 11 PM
+  if (firstReminder.getHours() > LAST_REMINDER_HOUR) {
+    console.log("Past 11 PM, no reminders scheduled for today");
+    return;
+  }
+  
+  // Create repeating alarm that fires every 1 hour
   chrome.alarms.create(REMINDER_ALARM, {
     when: firstReminder.getTime(),
     periodInMinutes: REMINDER_INTERVAL_MINUTES
   });
   
-  console.log(`First reminder scheduled for: ${firstReminder.toLocaleString()}, then every ${REMINDER_INTERVAL_MINUTES} minutes`);
+  console.log(`First reminder scheduled for: ${firstReminder.toLocaleString()}, then every ${REMINDER_INTERVAL_MINUTES} minutes until 11 PM`);
 }
 
 /**
@@ -105,6 +162,13 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   
   // Handle repeating reminder alarm
   if (alarm.name === REMINDER_ALARM) {
+    const now = new Date();
+    // Stop reminders after 11 PM (last reminder was at 11 PM)
+    if (now.getHours() > LAST_REMINDER_HOUR) {
+      chrome.alarms.clear(REMINDER_ALARM);
+      console.log("Reminders stopped: Past 11 PM");
+      return;
+    }
     checkAndSendReminder();
   }
 });
@@ -117,21 +181,25 @@ function checkAndSendReminder() {
     const isSolved = result.potdSolved === true;
     
     if (!isSolved) {
-      // Send notification with priority 2 to ensure system sound plays
+      // Send notification
       chrome.notifications.create({
         type: "basic",
         iconUrl: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
         title: "LeetCode POTD Reminder",
         message: "You haven't solved today's LeetCode POTD",
-        priority: 2, // High priority ensures system notification sound plays
+        priority: 2,
         requireInteraction: false
       }, (notificationId) => {
         if (chrome.runtime.lastError) {
           console.error("Notification error:", chrome.runtime.lastError);
         } else {
           console.log("Reminder notification sent:", notificationId);
+          currentNotificationId = notificationId; // Track notification ID
         }
       });
+      
+      // Play alarm sound via offscreen document
+      playAlarmSound();
     } else {
       // POTD is solved - cancel the repeating alarm
       chrome.alarms.clear(REMINDER_ALARM, (wasCleared) => {
@@ -140,6 +208,47 @@ function checkAndSendReminder() {
         }
       });
     }
+  });
+}
+
+/**
+ * Play alarm sound using offscreen document (MV3 compliant)
+ */
+function playAlarmSound() {
+  // Check if offscreen document already exists
+  chrome.runtime.getContexts({
+    contextTypes: ["OFFSCREEN_DOCUMENT"],
+    documentUrls: [chrome.runtime.getURL("offscreen.html")]
+  }, (contexts) => {
+    if (contexts.length === 0) {
+      // Create offscreen document
+      chrome.offscreen.createDocument({
+        url: "offscreen.html",
+        reasons: ["AUDIO_PLAYBACK"],
+        justification: "Play alarm sound for LeetCode POTD reminder"
+      }).then(() => {
+        // Wait a bit for document to load, then send message
+        setTimeout(() => {
+          sendPlaySoundMessage();
+        }, 500);
+      }).catch(error => {
+        console.error("Error creating offscreen document:", error);
+      });
+    } else {
+      // Document exists, send message directly
+      sendPlaySoundMessage();
+    }
+  });
+}
+
+/**
+ * Send play sound message to offscreen document
+ */
+function sendPlaySoundMessage() {
+  chrome.runtime.sendMessage({
+    action: "playAlarmSound"
+  }).catch(error => {
+    console.error("Error sending message to offscreen document:", error);
   });
 }
 
@@ -175,8 +284,33 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * Handle notification clicks
  */
 chrome.notifications.onClicked.addListener((notificationId) => {
+  // Stop alarm sound when notification is clicked/closed
+  stopAlarmSound();
+  
   // Open today's POTD page
   chrome.tabs.create({
     url: "https://leetcode.com/problemset/daily-problem"
   });
 });
+
+/**
+ * Handle notification closed (user dismisses it)
+ */
+chrome.notifications.onClosed.addListener((notificationId, byUser) => {
+  // Stop alarm sound when notification is closed
+  if (notificationId === currentNotificationId) {
+    stopAlarmSound();
+    currentNotificationId = null;
+  }
+});
+
+/**
+ * Stop alarm sound
+ */
+function stopAlarmSound() {
+  chrome.runtime.sendMessage({
+    action: "stopAlarmSound"
+  }).catch(error => {
+    // Ignore errors if offscreen document doesn't exist
+  });
+}
