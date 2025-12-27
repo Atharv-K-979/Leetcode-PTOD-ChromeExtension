@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "LeetCode POTD Reminder",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Reminds you to solve LeetCode's Problem of the Day if not yet solved.",
   "permissions": [
     "storage",

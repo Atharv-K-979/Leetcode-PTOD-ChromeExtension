@@ -2,19 +2,29 @@
  * LeetCode POTD Content Script
  * Detects when user has solved today's Problem of the Day
  * ONLY works on today's POTD problem page
+ * Version: 2.0 (No warnings - clean detection)
  */
 
-console.log("POTD content script loaded:", location.href);
+console.log("POTD content script v2.0 loaded:", location.href);
 
 /**
  * Check if current page is today's POTD page
  * @returns {boolean} True if this is the POTD page
  */
 function isPOTDPage() {
-  // Method 1: Check URL - POTD pages come from daily-problem redirect
-  // But we can't rely on URL alone since it redirects to the actual problem URL
+  // Method 1: Check URL for daily-question parameter (most reliable)
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('envType') === 'daily-question') {
+    console.log("POTD page detected via URL parameter: envType=daily-question");
+    return true;
+  }
   
-  // Method 2: Check for "Daily Challenge" badge or indicator in DOM
+  // Method 2: Check URL path for daily-problem redirect
+  if (window.location.pathname.includes('/problemset/daily-problem')) {
+    return true;
+  }
+  
+  // Method 3: Check for "Daily Challenge" badge or indicator in DOM
   const dailyChallengeIndicators = [
     'text-daily-challenge',
     'daily-challenge',
@@ -27,7 +37,6 @@ function isPOTDPage() {
     try {
       const elements = document.querySelectorAll(selector);
       if (elements.length > 0) {
-        console.log("POTD page detected via:", selector);
         return true;
       }
     } catch (e) {
@@ -35,32 +44,26 @@ function isPOTDPage() {
     }
   }
   
-  // Method 3: Check page text for "Daily Challenge" or "Problem of the Day"
+  // Method 4: Check page text for "Daily Challenge" or "Problem of the Day"
   const pageText = document.body.innerText || document.body.textContent || "";
   if (pageText.includes("Daily Challenge") || 
       pageText.includes("Problem of the Day") ||
       pageText.includes("Today's Challenge")) {
-    console.log("POTD page detected via text content");
     return true;
   }
   
-  // Method 4: Check for specific LeetCode POTD UI elements
-  // LeetCode often shows a badge or special indicator for daily challenges
+  // Method 5: Check for specific LeetCode POTD UI elements
   const potdBadges = document.querySelectorAll('[class*="badge"], [class*="tag"]');
   for (const badge of potdBadges) {
     const badgeText = badge.textContent || "";
     if (badgeText.toLowerCase().includes("daily") || 
         badgeText.toLowerCase().includes("challenge")) {
-      console.log("POTD page detected via badge");
       return true;
     }
   }
   
-  // If we can't definitively determine it's NOT the POTD, 
-  // we'll check anyway (better to be safe)
-  // But log a warning
-  console.warn("Could not definitively determine if this is POTD page, checking anyway");
-  return true; // Default to true to avoid missing detection
+  // Not a POTD page - return false (no warning needed)
+  return false;
 }
 
 /**
@@ -183,8 +186,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "checkStatus") {
     // Only check if this is the POTD page
     if (isPOTDPage()) {
-      const status = detectSolved();
-      sendResponse({ status });
+    const status = detectSolved();
+    sendResponse({ status });
     } else {
       sendResponse({ status: false, notPOTD: true });
     }

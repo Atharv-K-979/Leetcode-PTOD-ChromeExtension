@@ -5,7 +5,7 @@
 
 const REMINDER_ALARM = "potd_reminder_repeat";
 const MIDNIGHT_ALARM = "midnight_reset";
-const REMINDER_INTERVAL_MINUTES = 60; // Repeat every 1 hour
+const REMINDER_INTERVAL_MINUTES = 30; // Repeat every 30 minutes
 const FIRST_REMINDER_HOUR = 18; // Start reminders at 6:00 PM
 const LAST_REMINDER_HOUR = 23; // Stop reminders at 11:00 PM (last reminder at 11 PM)
 
@@ -34,11 +34,11 @@ chrome.runtime.onInstalled.addListener(() => {
     scheduleDailyAlarms();
     
     // Test notification if POTD not solved (for immediate testing)
-    if (!isSolved) {
-      setTimeout(() => {
-        sendTestNotification();
-      }, 2000); // Wait 2 seconds after install/reload to send test notification
-    }
+    // if (!isSolved) {
+    //   setTimeout(() => {
+    //     sendTestNotification();
+    //   }, 2000); // Wait 2 seconds after install/reload to send test notification
+    // }
   });
 });
 
@@ -111,22 +111,23 @@ function scheduleDailyAlarms() {
 
 /**
  * Schedule the first reminder of the day
- * Starts at 6:00 PM, repeats every 1 hour until 11:00 PM
+ * Starts at 6:00 PM, repeats every 30 minutes until 11:00 PM
  */
 function scheduleFirstReminder() {
   const now = new Date();
   const firstReminder = new Date(now);
   firstReminder.setHours(FIRST_REMINDER_HOUR, 0, 0, 0);
   
-  // If 6 PM has passed today, start at next hour
+  // If 6 PM has passed today, start at next 30-minute interval
   if (firstReminder <= now) {
-    // Move to next hour
-    firstReminder.setHours(firstReminder.getHours() + 1);
-    firstReminder.setMinutes(0, 0, 0);
+    // Calculate next 30-minute interval from now
+    const minutes = now.getMinutes();
+    const nextInterval = Math.ceil(minutes / REMINDER_INTERVAL_MINUTES) * REMINDER_INTERVAL_MINUTES;
+    firstReminder.setMinutes(nextInterval, 0, 0);
     
-    // If that's still in the past, add 1 hour
+    // If that's still in the past, add 30 minutes
     if (firstReminder <= now) {
-      firstReminder.setHours(firstReminder.getHours() + 1);
+      firstReminder.setMinutes(firstReminder.getMinutes() + REMINDER_INTERVAL_MINUTES);
     }
   }
   
@@ -136,7 +137,7 @@ function scheduleFirstReminder() {
     return;
   }
   
-  // Create repeating alarm that fires every 1 hour
+  // Create repeating alarm that fires every 30 minutes
   chrome.alarms.create(REMINDER_ALARM, {
     when: firstReminder.getTime(),
     periodInMinutes: REMINDER_INTERVAL_MINUTES
