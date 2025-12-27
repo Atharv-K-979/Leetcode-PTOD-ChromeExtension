@@ -1,55 +1,58 @@
-document.addEventListener("DOMContentLoaded", () => {
-  loadStatus();
-  loadSettings();
+/**
+ * LeetCode POTD Popup Script
+ * Simple status display - informational only
+ */
 
-  document.getElementById("time-select").addEventListener("change", saveSettings);
-  document.getElementById("enable-toggle").addEventListener("change", saveSettings);
-  document.getElementById("check-btn").addEventListener("click", checkNow);
+document.addEventListener("DOMContentLoaded", () => {
+  loadPOTDStatus();
 });
 
-function loadStatus() {
-  chrome.storage.local.get(["potdSolved"], (res) => {
-    document.getElementById("status-text").textContent =
-      res.potdSolved ? "✅ Solved" : "❌ Not Solved";
+/**
+ * Load and display current POTD status
+ */
+function loadPOTDStatus() {
+  // Get status from storage
+  chrome.storage.local.get(["potdSolved"], (result) => {
+    const isSolved = result.potdSolved === true;
+    updateStatusDisplay(isSolved);
   });
-}
-
-function loadSettings() {
-  chrome.storage.local.get(["reminderTime", "enabled"], (res) => {
-    document.getElementById("time-select").value = res.reminderTime || "09:00";
-    document.getElementById("enable-toggle").checked = res.enabled !== false;
-  });
-}
-
-function saveSettings() {
-  chrome.storage.local.set({
-    reminderTime: document.getElementById("time-select").value,
-    enabled: document.getElementById("enable-toggle").checked
-  });
-}
-
-function showError(msg) {
-  document.getElementById("error-text").textContent = msg;
-}
-
-function checkNow() {
-  showError("");
-
+  
+  // Also try to get status from content script if on POTD page
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const tab = tabs[0];
-
-    if (!tab || !tab.url || !tab.url.includes("leetcode.com/problems")) {
-      showError("Open today’s POTD problem page.");
-      return;
+    const currentTab = tabs[0];
+    
+    if (currentTab && currentTab.url && currentTab.url.includes("leetcode.com/problems")) {
+      chrome.tabs.sendMessage(currentTab.id, { action: "checkStatus" }, (response) => {
+        if (!chrome.runtime.lastError && response) {
+          updateStatusDisplay(response.status);
+        }
+      });
     }
-
-    chrome.tabs.sendMessage(tab.id, { action: "checkStatus" }, (res) => {
-      if (chrome.runtime.lastError || !res) {
-        showError("Unable to check. Reload POTD page.");
-        return;
-      }
-
-      chrome.storage.local.set({ potdSolved: res.status }, loadStatus);
-    });
   });
+}
+
+/**
+ * Update the status display
+ * @param {boolean} isSolved - Whether POTD is solved
+ */
+function updateStatusDisplay(isSolved) {
+  const statusDisplay = document.getElementById("status-display");
+  const errorMessage = document.getElementById("error-message");
+  
+  // Clear any previous error
+  errorMessage.textContent = "";
+  
+  if (isSolved) {
+    statusDisplay.innerHTML = `
+      <span class="status-icon">✅</span>
+      <span class="status-text">Solved</span>
+    `;
+    statusDisplay.className = "status-solved";
+  } else {
+    statusDisplay.innerHTML = `
+      <span class="status-icon">❌</span>
+      <span class="status-text">Not Solved</span>
+    `;
+    statusDisplay.className = "status-not-solved";
+  }
 }

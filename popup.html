@@ -1,26 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LeetCode POTD Status</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h3>LeetCode POTD</h3>
-
-  <div id="status-text">Checking...</div>
-  <div id="error-text"></div>
-
-  <label>
-    Reminder Time:
-    <input type="time" id="time-select" value="09:00">
-  </label>
-
-  <label>
-    Enable Reminder:
-    <input type="checkbox" id="enable-toggle" checked>
-  </label>
-
-  <button id="check-btn">Check Status Now</button>
-
+  <div class="container">
+    <h3>Today's POTD Status</h3>
+    <div id="status-display" class="status-checking">
+      <span class="spinner"></span>
+      <span>Checking status...</span>
+    </div>
+    <div id="error-message" class="error-message"></div>
+  </div>
+  
   <script src="popup.js"></script>
 </body>
 </html>
