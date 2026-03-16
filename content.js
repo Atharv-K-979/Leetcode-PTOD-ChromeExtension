@@ -74,34 +74,27 @@ function detectSolved() {
   // More comprehensive solved detection
   let isSolved = false;
   
-  // Method 1: Check for "Solved" text in various locations
-  const bodyText = document.body.innerText || document.body.textContent || "";
-  if (bodyText.toLowerCase().includes("solved")) {
-    isSolved = true;
-  }
-  
-  // Method 2: Check for solved SVG/icon elements
+  // Method 1: Check for solved SVG/icon elements (LeetCode typically uses aria-label="Solved" or context labels)
   const solvedElements = document.querySelectorAll('svg[aria-label="Solved"], svg[aria-label="solved"]');
   if (solvedElements.length > 0) {
     isSolved = true;
   }
   
-  // Method 3: Check for specific class names that indicate solved status
-  const solvedClassElements = document.querySelectorAll('[class*="solved"], [class*="completed"]');
-  if (solvedClassElements.length > 0) {
-    isSolved = true;
+  // Method 2: Check for "Accepted" or "Solved" text in success-colored elements
+  const successElements = document.querySelectorAll('.text-green-s, .text-success, [class*="text-green"], .text-green-400, .text-green-500');
+  for (const el of successElements) {
+    const text = el.textContent || "";
+    if (text.includes("Accepted") || text.includes("Solved")) {
+      isSolved = true;
+    }
   }
   
-  // Method 4: Check for green checkmark or success indicators
-  const checkmarkElements = document.querySelectorAll('svg[data-icon="check"], .text-green-500, .text-green-400');
-  if (checkmarkElements.length > 0) {
-    isSolved = true;
-  }
-  
-  // Method 5: Look for "Accepted" or success submission status
-  const acceptedElements = document.querySelectorAll('[class*="accepted"], [class*="success"]');
-  if (acceptedElements.length > 0) {
-    isSolved = true;
+  // Method 3: Look for specific submission success status
+  const acceptedElements = document.querySelectorAll('[data-e2e-locator="submission-result"]');
+  for (const el of acceptedElements) {
+    if ((el.textContent || "").includes("Accepted")) {
+      isSolved = true;
+    }
   }
   
   console.log("POTD solved detection:", isSolved ? "SOLVED" : "NOT SOLVED");
