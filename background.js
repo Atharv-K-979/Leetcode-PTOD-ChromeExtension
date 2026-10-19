@@ -5,9 +5,9 @@
 
 const REMINDER_ALARM = "potd_reminder_repeat";
 const MIDNIGHT_ALARM = "midnight_reset";
-const REMINDER_INTERVAL_MINUTES = 10; // Repeat every 10 minutes
-const FIRST_REMINDER_HOUR = 9; // Start reminders at 9:45 AM
-const FIRST_REMINDER_MINUTE = 45; 
+const REMINDER_INTERVAL_MINUTES = 30; // Repeat every 10 minutes
+const FIRST_REMINDER_HOUR = 7; // Start reminders at 9:45 AM
+const FIRST_REMINDER_MINUTE = 0; 
 const LAST_REMINDER_HOUR = 23; // Stop reminders at 11:00 PM (last reminder at 11 PM)
 
 // Track current notification ID to stop audio when closed
